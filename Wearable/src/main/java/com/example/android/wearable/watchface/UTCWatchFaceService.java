@@ -51,7 +51,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
      * Update rate in milliseconds for interactive mode. We update once a second to advance the
      * second hand.
      */
-    private static final long INTERACTIVE_UPDATE_RATE_MS = 100; // 10 fps
+    private static final long INTERACTIVE_UPDATE_RATE_MS = 50; // 20 fps
 
     private static final Typeface BOLD_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
