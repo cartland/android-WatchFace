@@ -83,6 +83,9 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         private float mWatchHeight;
         private long mLastUpdate = -1;
+        private final Rect mCardBounds = new Rect();
+        private float mLastDesiredHeight;
+        private long mTimeOfDesiredHeight;
 
         int mInteractiveHourTickColor =
                 DigitalWatchFaceUtil.COLOR_VALUE_DEFAULT_AND_AMBIENT_HOUR_DIGITS;
@@ -125,8 +128,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         Bitmap mBackgroundBitmap;
         Bitmap mBackgroundScaledBitmap;
-        private final Rect mCardBounds = new Rect();
-        private float mLastDesiredHeight;
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -260,7 +261,10 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                 desiredHeight = boundsHeight;
             }
 
-            if (!isInAmbientMode() && desiredHeight == mLastDesiredHeight) {
+            if (desiredHeight != mLastDesiredHeight) {
+                mTimeOfDesiredHeight = now;
+            }
+            if (!isInAmbientMode() && now - mTimeOfDesiredHeight > 200) {
                 // Animate watch changing size.
                 if (mLastUpdate < 0) {
                     mWatchHeight = desiredHeight;
