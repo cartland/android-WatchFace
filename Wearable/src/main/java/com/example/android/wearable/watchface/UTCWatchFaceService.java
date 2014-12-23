@@ -21,14 +21,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -55,7 +52,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
      * Update rate in milliseconds for interactive mode. We update once a second to advance the
      * second hand.
      */
-    private static final long INTERACTIVE_UPDATE_RATE_MS = 60; // ~15 fps
+    private static final long INTERACTIVE_UPDATE_RATE_MS = 100; // 10 fps
 
     private static final Typeface BOLD_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
@@ -74,7 +71,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         private static final int ANIMATION_PIXELS_PER_SECOND = 200;
 
         private Paint mHourTickPaint;
-        private Paint mMinutePaint;
+        private Paint mHandPaint;
         private Paint mUTCDiffPaint;
         private Paint mCurrentHourPaint;
         private Paint mUTCCirclePaint;
@@ -124,8 +121,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
          */
         boolean mLowBitAmbient;
 
-        Bitmap mBackgroundBitmap;
-        Bitmap mBackgroundScaledBitmap;
+        private boolean mIsRound;
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -141,15 +137,13 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                     .build());
 
             Resources resources = UTCWatchFaceService.this.getResources();
-            Drawable backgroundDrawable = resources.getDrawable(R.drawable.bg);
-            mBackgroundBitmap = ((BitmapDrawable) backgroundDrawable).getBitmap();
 
             mHourTickPaint = createTextPaint(resources.getColor(R.color.hour_tick), BOLD_TYPEFACE);
             mHourTickPaint.setTextAlign(Paint.Align.CENTER);
-            mMinutePaint = createTextPaint(resources.getColor(R.color.minute_hand));
-            mMinutePaint.setStrokeWidth(3.f);
-            mMinutePaint.setAntiAlias(true);
-            mMinutePaint.setStrokeCap(Paint.Cap.ROUND);
+            mHandPaint = createTextPaint(resources.getColor(R.color.hand_color));
+            mHandPaint.setStrokeWidth(3.f);
+            mHandPaint.setAntiAlias(true);
+            mHandPaint.setStrokeCap(Paint.Cap.ROUND);
 
             mUTCDiffPaint = createTextPaint(resources.getColor(R.color.utc_diff));
 
@@ -214,7 +208,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             if (mLowBitAmbient) {
                 boolean antiAlias = !inAmbientMode;
                 mHourTickPaint.setAntiAlias(antiAlias);
-                mMinutePaint.setAntiAlias(antiAlias);
+                mHandPaint.setAntiAlias(antiAlias);
                 mCurrentHourPaint.setAntiAlias(antiAlias);
                 mUTCCirclePaint.setAntiAlias(antiAlias);
                 mUTCDiffPaint.setAntiAlias(antiAlias);
@@ -233,7 +227,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             if (mMute != inMuteMode) {
                 mMute = inMuteMode;
                 mHourTickPaint.setAlpha(inMuteMode ? 100 : 255);
-                mMinutePaint.setAlpha(inMuteMode ? 100 : 255);
+                mHandPaint.setAlpha(inMuteMode ? 100 : 255);
                 mCurrentHourPaint.setAlpha(inMuteMode ? 80 : 255);
                 mUTCDiffPaint.setAlpha(inMuteMode ? 80 : 180);
                 mUTCCirclePaint.setAlpha(inMuteMode ? 80 : 255);
@@ -264,10 +258,10 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             float radius = Math.min(centerX, centerY);
 
             // Draw the minutes.
-            drawMinuteLine(canvas, mTime.minute, mMinutePaint, radius, centerX, centerY,
+            drawMinuteLine(canvas, mTime.minute, mHandPaint, radius, centerX, centerY,
                     mHourTickPaint);
 
-            drawHourLine(canvas, mTime.hour, mCurrentHourPaint, radius, centerX, centerY,
+            drawHourLine(canvas, mTime.hour, mHandPaint, radius, centerX, centerY,
                     mHourTickPaint);
 
             // Calculate GMT hour.
@@ -313,8 +307,14 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             String hourDiffString = formatUTCDiff(hourDiff);
             float hourDiffWidth = mUTCDiffPaint.measureText(hourDiffString);
-            float x = bounds.right - (hourDiffWidth) - 20;
-            canvas.drawText(hourDiffString, x, 30, mUTCDiffPaint);
+
+            if (mIsRound) {
+                mUTCDiffPaint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(hourDiffString, centerX, centerY, mUTCDiffPaint);
+            } else {
+                float x = bounds.right - (hourDiffWidth) - 20;
+                canvas.drawText(hourDiffString, x, 30, mUTCDiffPaint);
+            }
         }
 
         private void drawBackground(Canvas canvas, int width, int height) {
@@ -513,16 +513,16 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             // Load resources that have alternate values for round watches.
             Resources resources = UTCWatchFaceService.this.getResources();
-            boolean isRound = insets.isRound();
-            float textSize = resources.getDimension(isRound
+            mIsRound = insets.isRound();
+            float textSize = resources.getDimension(mIsRound
                     ? R.dimen.utc_text_size_round : R.dimen.utc_text_size);
-            float minuteTextSize = resources.getDimension(isRound
+            float minuteTextSize = resources.getDimension(mIsRound
                     ? R.dimen.utc_minute_text_size_round : R.dimen.utc_minute_text_size);
-            float tickTextSize = resources.getDimension(isRound
+            float tickTextSize = resources.getDimension(mIsRound
                     ? R.dimen.utc_tick_text_size_round : R.dimen.utc_tick_text_size);
 
             mHourTickPaint.setTextSize(tickTextSize);
-            mMinutePaint.setTextSize(minuteTextSize);
+            mHandPaint.setTextSize(minuteTextSize);
             mUTCDiffPaint.setTextSize(tickTextSize);
         }
 

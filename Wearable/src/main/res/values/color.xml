@@ -21,10 +21,10 @@
     <color name="config_activity_header_text_color">#959595</color>
     <color name="color_item_label_color">#000000</color>
     <color name="color_item_circle_border_color">#424242</color>
-    <color name="hour_tick">#FFCCCCCC</color>
+    <color name="hour_tick">#FFFFFFFF</color>
     <color name="current_hour">#FFFF0000</color>
-    <color name="gmt_hour">#FFCCCCCC</color>
-    <color name="minute_hand">#FF666666</color>
+    <color name="gmt_hour">#FFE8E8FF</color>
+    <color name="hand_color">#FF666666</color>
     <color name="utc_diff">#FFFF0000</color>
-    <color name="utc_hour">#FFCCCCCC</color>
+    <color name="utc_hour">#FFFFFFFF</color>
 </resources>
