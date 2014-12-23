@@ -16,6 +16,7 @@
 <resources>
     <dimen name="digital_text_size">40dp</dimen>
     <dimen name="digital_text_size_round">45dp</dimen>
+    <dimen name="utc_circle_radius">10dp</dimen>
     <dimen name="utc_text_size">20dp</dimen>
     <dimen name="utc_text_size_round">25dp</dimen>
     <dimen name="utc_minute_text_size">25dp</dimen>

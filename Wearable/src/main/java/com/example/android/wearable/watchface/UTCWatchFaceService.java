@@ -154,7 +154,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             mCurrentHourDotPaint = new Paint();
             mCurrentHourDotPaint.setColor(resources.getColor(R.color.current_hour));
-            mCurrentHourDotPaint.setStrokeWidth(5f);
+            mCurrentHourDotPaint.setStrokeWidth(3f);
             mCurrentHourDotPaint.setAntiAlias(true);
             mCurrentHourDotPaint.setStyle(Paint.Style.STROKE);
 
@@ -319,20 +319,21 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             hourRadius = radius - 10 - textHeight - spiralStep * hour;
             dotX = (float) Math.sin(hourRot) * hourRadius;
             dotY = (float) -Math.cos(hourRot) * hourRadius;
-            canvas.drawCircle(centerX + dotX, centerY + dotY, dotRadius + 2f, mUTCCirclePaint);
+            canvas.drawCircle(centerX + dotX, centerY + dotY, dotRadius - 1f, mUTCCirclePaint);
             mTime.switchTimezone(zone);
 
             // Draw the hours in a spiral.
             hourRadius = radius - 10 - textHeight;
             for (int tickIndex = 0; tickIndex < 24; tickIndex++) {
-
                 float tickRot = (float) (tickIndex * Math.PI * 2 / 12);
                 float innerX = (float) Math.sin(tickRot) * hourRadius;
                 float innerY = (float) -Math.cos(tickRot) * hourRadius;
                 String hourText = Integer.toString(tickIndex);
                 float hourWidth = mHourTickPaint.measureText(hourText);
-                canvas.drawText(hourText, centerX + innerX - (hourWidth / 2),
-                        centerY + innerY + (textHeight / 2), mHourTickPaint);
+                float textCenterX = centerX + innerX;
+                float textCenterY = centerY + innerY;
+                canvas.drawText(hourText, textCenterX - (hourWidth / 2),
+                        textCenterY + (textHeight / 2), mHourTickPaint);
                 hourRadius -= spiralStep;
             }
 
@@ -341,24 +342,22 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             float x = centerX - (minuteWidth) / 2;
 
-            // Draw the minutes.
-            canvas.drawText(minuteString, x, mYOffset, mMinutePaint);
-            x += minuteWidth;
-
-            // Draw the UTC diff.
             Rect minuteBounds = new Rect();
             mMinutePaint.getTextBounds(minuteString, 0, 1, minuteBounds);
             float minuteHeight = (float)minuteBounds.height();
 
+            // Draw the minutes.
+            canvas.drawText(minuteString, x, centerY + minuteHeight / 2, mMinutePaint);
+
+            // Draw the UTC diff.
             TimeZone tz = TimeZone.getTimeZone(mTime.timezone);
             long milliDiff = tz.getOffset(mTime.toMillis(false));
             float hourDiff = milliDiff / 1000f / 60f / 60f;
 
             String hourDiffString = formatUTCDiff(hourDiff);
             float hourDiffWidth = mUTCDiffPaint.measureText(hourDiffString);
-            x = centerX - (hourDiffWidth) / 2;
-            canvas.drawText(hourDiffString, x, mYOffset + minuteHeight + 10, mUTCDiffPaint);
-            x += hourDiffWidth;
+            x = bounds.right - (hourDiffWidth) - 20;
+            canvas.drawText(hourDiffString, x, 30, mUTCDiffPaint);
         }
 
         private String formatTwoDigitNumber(int hour) {
