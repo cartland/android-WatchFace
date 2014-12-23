@@ -23,6 +23,7 @@ import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -262,27 +263,40 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             float radius = Math.min(centerX, centerY);
 
-            // Draw time marker.
-            drawHourMarker(canvas, mTime.hour, mCurrentHourDotPaint, radius, centerX, centerY,
-                    mHourTickPaint);
+            // Draw the minutes.
+            String minuteString = formatTwoDigitNumber(mTime.minute);
+            drawTextCenterVertical(canvas, minuteString, centerX, centerY, mMinutePaint);
 
-            // Draw GMT marker.
+            // Calculate GMT hour.
             String zone = mTime.timezone;
             String gmtZone = "GMT";
             mTime.switchTimezone(gmtZone);
-            drawHourMarker(canvas, mTime.hour, mUTCCirclePaint, radius, centerX, centerY,
-                    mHourTickPaint);
+            int gmtHour = mTime.hour;
             mTime.switchTimezone(zone);
 
             // Draw the hours in a spiral.
             for (int hour = 0; hour < 24; hour++) {
-                drawHour(canvas, hour, mHourTickPaint, radius, centerX, centerY);
+                if (hour == mTime.hour || hour == gmtHour) {
+                    float size = mHourTickPaint.getTextSize();
+                    float outerTextBuffer = getTextHeight(Integer.toString(hour), mHourTickPaint);
+                    mHourTickPaint.setTextSize(size * 2);
+                    float hourRadius = calculateHourRadius(radius, hour, outerTextBuffer);
+                    if (hour == mTime.hour) {
+                        int color = mHourTickPaint.getColor();
+                        mHourTickPaint.setColor(getResources().getColor(R.color.current_hour));
+                        drawHour(canvas, hour, mHourTickPaint, hourRadius, centerX, centerY);
+                        mHourTickPaint.setColor(color);
+                    } else {
+                        drawHour(canvas, hour, mHourTickPaint, hourRadius, centerX, centerY);
+                    }
+                    mHourTickPaint.setTextSize(size);
+                } else {
+                    float textHeight = getTextHeight(Integer.toString(hour), mHourTickPaint);
+                    float hourRadius = calculateHourRadius(radius, hour, textHeight);
+                    drawHour(canvas, hour, mHourTickPaint, hourRadius, centerX, centerY);
+                }
+
             }
-
-            String minuteString = formatTwoDigitNumber(mTime.minute);
-
-            // Draw the minutes.
-            drawTextCenterVertical(canvas, minuteString, centerX, centerY, mMinutePaint);
 
             // Draw the UTC diff.
             TimeZone tz = TimeZone.getTimeZone(mTime.timezone);
@@ -296,14 +310,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         }
 
         private void drawBackground(Canvas canvas, int width, int height) {
-            // Draw the background, scaled to fit.
-            if (mBackgroundScaledBitmap == null
-                    || mBackgroundScaledBitmap.getWidth() != width
-                    || mBackgroundScaledBitmap.getHeight() != height) {
-                mBackgroundScaledBitmap = Bitmap.createScaledBitmap(mBackgroundBitmap,
-                        width, height, true /* filter */);
-            }
-            canvas.drawBitmap(mBackgroundScaledBitmap, 0, 0, null);
+            canvas.drawColor(Color.BLACK);
         }
 
         private void drawTextCenterVertical(Canvas canvas, String text, float x, float y, Paint paint) {
@@ -369,13 +376,11 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             canvas.drawCircle(circleCenterX, circleCenterY, dotRadius, paint);
         }
 
-        private void drawHour(Canvas canvas, float hour, Paint paint, float radius,
+        private void drawHour(Canvas canvas, float hour, Paint paint, float hourRadius,
                               float centerX, float centerY) {
             String text = Integer.toString((int)hour);
 
-            float textHeight = getTextHeight(text, paint);
             float rot = calculateHourRot(hour);
-            float hourRadius = calculateHourRadius(radius, hour, textHeight);
             float offsetX = calculateXComponent(rot, hourRadius);
             float offsetY = calculateYComponent(rot, hourRadius);
 
@@ -403,7 +408,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         }
 
         private float calculateHourRadius(float radius, float hour, float textHeight) {
-            float inset = (hour > 11) ? (textHeight * 2.0f) : 0;
+            float inset = (hour > 11) ? (textHeight * 2.2f) : 0;
             return radius - 10 - textHeight - inset;
         }
 

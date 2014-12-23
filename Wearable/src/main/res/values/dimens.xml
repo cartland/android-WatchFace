@@ -19,8 +19,8 @@
     <dimen name="utc_circle_radius">10dp</dimen>
     <dimen name="utc_text_size">20dp</dimen>
     <dimen name="utc_text_size_round">25dp</dimen>
-    <dimen name="utc_minute_text_size">25dp</dimen>
-    <dimen name="utc_minute_text_size_round">30dp</dimen>
+    <dimen name="utc_minute_text_size">35dp</dimen>
+    <dimen name="utc_minute_text_size_round">40dp</dimen>
     <dimen name="utc_tick_text_size">12dp</dimen>
     <dimen name="utc_tick_text_size_round">15dp</dimen>
     <dimen name="digital_am_pm_size">25dp</dimen>
