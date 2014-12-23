@@ -57,7 +57,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
      * Update rate in milliseconds for interactive mode. We update once a second to advance the
      * second hand.
      */
-    private static final long INTERACTIVE_UPDATE_RATE_MS = TimeUnit.SECONDS.toMillis(1);
+    private static final long INTERACTIVE_UPDATE_RATE_MS = 33; // ~30 fps
 
     private static final Typeface BOLD_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
@@ -75,6 +75,8 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         static final int MSG_UPDATE_TIME = 0;
 
+        static final int ANIMATION_PIXELS_PER_SECOND = 200;
+
         Paint mHourPaint;
         Paint mHourTickPaint;
         Paint mMinutePaint;
@@ -86,6 +88,9 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         boolean mMute;
         Time mTime;
+
+        private float mWatchHeight;
+        private long mLastUpdate = -1;
 
         int mInteractiveHourTickColor =
                 DigitalWatchFaceUtil.COLOR_VALUE_DEFAULT_AND_AMBIENT_HOUR_DIGITS;
@@ -260,29 +265,52 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-            mTime.setToNow();
+            long now = System.currentTimeMillis();
+            mTime.set(now);
 
             int width = bounds.width();
-            int height = bounds.height();
+            int boundsHeight = bounds.height();
 
             // Draw the background, scaled to fit.
             if (mBackgroundScaledBitmap == null
                     || mBackgroundScaledBitmap.getWidth() != width
-                    || mBackgroundScaledBitmap.getHeight() != height) {
+                    || mBackgroundScaledBitmap.getHeight() != boundsHeight) {
                 mBackgroundScaledBitmap = Bitmap.createScaledBitmap(mBackgroundBitmap,
-                        width, height, true /* filter */);
+                        width, boundsHeight, true /* filter */);
             }
             canvas.drawBitmap(mBackgroundScaledBitmap, 0, 0, null);
 
+            int desiredHeight;
             if (mCardBounds != null && mCardBounds.top > 0) {
-                height = mCardBounds.top; // Show watch above card.
+                desiredHeight = mCardBounds.top; // Show watch above card.
+            } else {
+                desiredHeight = boundsHeight;
             }
+
+            // Animate watch changing size.
+            if (mLastUpdate < 0) {
+                mWatchHeight = desiredHeight;
+            } else if (desiredHeight != (int) mWatchHeight) {
+                float elapseMs = now - mLastUpdate;
+                float maxUpdatePx = ANIMATION_PIXELS_PER_SECOND * elapseMs / 1000;
+                int diff = desiredHeight - (int) mWatchHeight;
+                if (Math.abs(diff) <= maxUpdatePx) {
+                    mWatchHeight = desiredHeight;
+                } else if (diff > 0) {
+                    mWatchHeight += maxUpdatePx;
+                } else if (diff < 0) {
+                    mWatchHeight -= maxUpdatePx;
+                } else {
+                    mWatchHeight = desiredHeight;
+                }
+            }
+            mLastUpdate = now;
 
             // Find the center. Ignore the window insets so that, on round watches with a
             // "chin", the watch face is centered on the entire screen, not just the usable
             // portion.
             float centerX = width / 2f;
-            float centerY = height / 2f;
+            float centerY = mWatchHeight / 2f;
 
             float radius = Math.min(centerX, centerY);
 
@@ -351,8 +379,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             float hourDiff = milliDiff / 1000f / 60f / 60f;
 
             String hourDiffString = formatUTCDiff(hourDiff);
-            Log.d(TAG, "timezone: " + mTime.timezone + " hourDiff: " + hourDiff
-                    + " formatted: " +  hourDiffString);
             float hourDiffWidth = mUTCDiffPaint.measureText(hourDiffString);
             x = centerX - (hourDiffWidth) / 2;
             canvas.drawText(hourDiffString, x, mYOffset + minuteHeight + 10, mUTCDiffPaint);
