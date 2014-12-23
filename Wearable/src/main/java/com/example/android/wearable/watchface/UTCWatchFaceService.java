@@ -60,6 +60,8 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
     private static final Typeface BOLD_TYPEFACE =
             Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD);
+    private static final Typeface NORMAL_TYPEFACE =
+            Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
 
     @Override
     public Engine onCreateEngine() {
@@ -67,17 +69,25 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
     }
 
     private class Engine extends CanvasWatchFaceService.Engine {
+        static final String COLON_STRING = ":";
+
         static final int MSG_UPDATE_TIME = 0;
 
         Paint mHourPaint;
+        Paint mHourTickPaint;
         Paint mMinutePaint;
-        Paint mSecondPaint;
-        Paint mTickPaint;
+        Paint mHourDotPaint;
+        Paint mUTCPaint;
+        private Paint mColonPaint;
         boolean mMute;
         Time mTime;
 
+        int mInteractiveHourTickColor =
+                DigitalWatchFaceUtil.COLOR_VALUE_DEFAULT_AND_AMBIENT_HOUR_DIGITS;
         int mInteractiveHourDigitsColor =
                 DigitalWatchFaceUtil.COLOR_VALUE_DEFAULT_AND_AMBIENT_HOUR_DIGITS;
+        int mInteractiveMinuteDigitsColor =
+                DigitalWatchFaceUtil.COLOR_VALUE_DEFAULT_AND_AMBIENT_MINUTE_DIGITS;
 
         /** Handler to update the time once a second in interactive mode. */
         final Handler mUpdateTimeHandler = new Handler() {
@@ -117,6 +127,9 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         Bitmap mBackgroundBitmap;
         Bitmap mBackgroundScaledBitmap;
+        private float mYOffset;
+        private float mColonWidth;
+        private Rect mCardBounds;
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -135,24 +148,25 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             Drawable backgroundDrawable = resources.getDrawable(R.drawable.bg);
             mBackgroundBitmap = ((BitmapDrawable) backgroundDrawable).getBitmap();
 
+            mYOffset = resources.getDimension(R.dimen.digital_y_offset);
+
+            mHourTickPaint = createTextPaint(mInteractiveHourTickColor, BOLD_TYPEFACE);
             mHourPaint = createTextPaint(mInteractiveHourDigitsColor, BOLD_TYPEFACE);
+            mMinutePaint = createTextPaint(mInteractiveMinuteDigitsColor);
 
-            mMinutePaint = new Paint();
-            mMinutePaint.setARGB(255, 200, 200, 200);
-            mMinutePaint.setStrokeWidth(3.f);
-            mMinutePaint.setAntiAlias(true);
-            mMinutePaint.setStrokeCap(Paint.Cap.ROUND);
+            mHourDotPaint = new Paint();
+            mHourDotPaint.setARGB(255, 255, 0, 0);
+            mHourDotPaint.setStrokeWidth(2.f);
+            mHourDotPaint.setAntiAlias(true);
+            mHourDotPaint.setStrokeCap(Paint.Cap.ROUND);
 
-            mSecondPaint = new Paint();
-            mSecondPaint.setARGB(255, 255, 0, 0);
-            mSecondPaint.setStrokeWidth(2.f);
-            mSecondPaint.setAntiAlias(true);
-            mSecondPaint.setStrokeCap(Paint.Cap.ROUND);
+            mUTCPaint = new Paint();
+            mUTCPaint.setARGB(255, 0, 0, 255);
+            mUTCPaint.setStrokeWidth(5);
+            mUTCPaint.setAntiAlias(true);
+            mUTCPaint.setStyle(Paint.Style.STROKE);
 
-            mTickPaint = new Paint();
-            mTickPaint.setARGB(100, 255, 255, 255);
-            mTickPaint.setStrokeWidth(2.f);
-            mTickPaint.setAntiAlias(true);
+            mColonPaint = createTextPaint(resources.getColor(R.color.digital_colons));
 
             mTime = new Time();
         }
@@ -161,6 +175,10 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         public void onDestroy() {
             mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
             super.onDestroy();
+        }
+
+        private Paint createTextPaint(int defaultInteractiveColor) {
+            return createTextPaint(defaultInteractiveColor, NORMAL_TYPEFACE);
         }
 
         private Paint createTextPaint(int defaultInteractiveColor, Typeface typeface) {
@@ -197,10 +215,11 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             }
             if (mLowBitAmbient) {
                 boolean antiAlias = !inAmbientMode;
+                mHourTickPaint.setAntiAlias(antiAlias);
                 mHourPaint.setAntiAlias(antiAlias);
                 mMinutePaint.setAntiAlias(antiAlias);
-                mSecondPaint.setAntiAlias(antiAlias);
-                mTickPaint.setAntiAlias(antiAlias);
+                mHourDotPaint.setAntiAlias(antiAlias);
+                mUTCPaint.setAntiAlias(antiAlias);
             }
             invalidate();
 
@@ -215,9 +234,11 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             boolean inMuteMode = (interruptionFilter == WatchFaceService.INTERRUPTION_FILTER_NONE);
             if (mMute != inMuteMode) {
                 mMute = inMuteMode;
+                mHourTickPaint.setAlpha(inMuteMode ? 100 : 255);
                 mHourPaint.setAlpha(inMuteMode ? 100 : 255);
                 mMinutePaint.setAlpha(inMuteMode ? 100 : 255);
-                mSecondPaint.setAlpha(inMuteMode ? 80 : 255);
+                mHourDotPaint.setAlpha(inMuteMode ? 80 : 255);
+                mUTCPaint.setAlpha(inMuteMode ? 80 : 255);
                 invalidate();
             }
         }
@@ -245,42 +266,72 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             float centerY = height / 2f;
 
             Rect textBounds = new Rect();
-            mHourPaint.getTextBounds("24",0,1, textBounds);
+            mHourTickPaint.getTextBounds("24",0,1, textBounds);
             float textHeight = (float)textBounds.height();
+            float spiralStep = (textHeight * 2.0f) / 12.0f;
+
+            // Draw hour dot.
+            float hour = mTime.hour;
+            float hourRot = (float) (hour * Math.PI * 2 / 12);
+            float hourRadius = centerX - 10 - textHeight - spiralStep * hour;
+            float dotX = (float) Math.sin(hourRot) * hourRadius;
+            float dotY = (float) -Math.cos(hourRot) * hourRadius;
+            Resources resources = UTCWatchFaceService.this.getResources();
+            float dotRadius = resources.getDimension(R.dimen.utc_text_size) * .75f;
+            canvas.drawCircle(centerX + dotX, centerY + dotY, dotRadius,
+                    mHourDotPaint);
+
+            // Draw other hour circle.
+            String zone = mTime.getCurrentTimezone();
+            Log.d(TAG, "getCurrentTimezone(): " + zone);
+            Log.d(TAG, "mTime hour: " + mTime.hour);
+            mTime.switchTimezone("GMT");
+            Log.d(TAG, "switchTimezone, new hour: " + mTime.hour);
+            hour = mTime.hour;
+            hourRot = (float) (hour * Math.PI * 2 / 12);
+            hourRadius = centerX - 10 - textHeight - spiralStep * hour;
+            dotX = (float) Math.sin(hourRot) * hourRadius;
+            dotY = (float) -Math.cos(hourRot) * hourRadius;
+            canvas.drawCircle(centerX + dotX, centerY + dotY, dotRadius + 2f,
+                    mUTCPaint);
+            mTime.switchTimezone(zone);
 
             // Draw the hours in a spiral.
-            float innerTickRadius = centerX - 10 - textHeight;
+            hourRadius = centerX - 10 - textHeight;
             for (int tickIndex = 0; tickIndex < 24; tickIndex++) {
+
                 float tickRot = (float) (tickIndex * Math.PI * 2 / 12);
-                float innerX = (float) Math.sin(tickRot) * innerTickRadius;
-                float innerY = (float) -Math.cos(tickRot) * innerTickRadius;
-                canvas.drawText(Integer.toString(tickIndex), centerX + innerX, centerY + innerY,
-                        mHourPaint);
-                innerTickRadius -= (textHeight * 2.0) / 12.0;
+                float innerX = (float) Math.sin(tickRot) * hourRadius;
+                float innerY = (float) -Math.cos(tickRot) * hourRadius;
+                String hourText = Integer.toString(tickIndex);
+                float hourWidth = mHourTickPaint.measureText(hourText);
+                canvas.drawText(hourText, centerX + innerX - (hourWidth / 2),
+                        centerY + innerY + (textHeight / 2),
+                        mHourTickPaint);
+                hourRadius -= spiralStep;
             }
 
-            float secRot = mTime.second / 30f * (float) Math.PI;
-            int minutes = mTime.minute;
-            float minRot = minutes / 30f * (float) Math.PI;
-            float hrRot = ((mTime.hour + (minutes / 60f)) / 6f ) * (float) Math.PI;
+            String hourString = String.valueOf(mTime.hour);
+            float hourWidth = mHourPaint.measureText(hourString);
+            String minuteString = formatTwoDigitNumber(mTime.minute);
+            float minuteWidth = mMinutePaint.measureText(minuteString);
 
-            float secLength = centerX - 20;
-            float minLength = centerX - 40;
-            float hrLength = centerX - 80;
+            float x = centerX - (hourWidth + mColonWidth + minuteWidth) / 2;
+            // Draw the hours.
+            canvas.drawText(hourString, x, mYOffset, mHourPaint);
+            x += hourWidth;
 
-            if (!isInAmbientMode()) {
-                float secX = (float) Math.sin(secRot) * secLength;
-                float secY = (float) -Math.cos(secRot) * secLength;
-                canvas.drawLine(centerX, centerY, centerX + secX, centerY + secY, mSecondPaint);
-            }
+            // Draw the colon.
+            canvas.drawText(COLON_STRING, x, mYOffset, mColonPaint);
+            x += mColonWidth;
 
-            float minX = (float) Math.sin(minRot) * minLength;
-            float minY = (float) -Math.cos(minRot) * minLength;
-            canvas.drawLine(centerX, centerY, centerX + minX, centerY + minY, mMinutePaint);
+            // Draw the minutes.
+            canvas.drawText(minuteString, x, mYOffset, mMinutePaint);
+            x += minuteWidth;
+        }
 
-            float hrX = (float) Math.sin(hrRot) * hrLength;
-            float hrY = (float) -Math.cos(hrRot) * hrLength;
-            canvas.drawLine(centerX, centerY, centerX + hrX, centerY + hrY, mHourPaint);
+        private String formatTwoDigitNumber(int hour) {
+            return String.format("%02d", hour);
         }
 
         @Override
@@ -333,11 +384,17 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             Resources resources = UTCWatchFaceService.this.getResources();
             boolean isRound = insets.isRound();
             float textSize = resources.getDimension(isRound
-                    ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
+                    ? R.dimen.utc_text_size_round : R.dimen.utc_text_size);
+            float tickTextSize = resources.getDimension(isRound
+                    ? R.dimen.utc_tick_text_size_round : R.dimen.utc_tick_text_size);
 
+            mHourTickPaint.setTextSize(tickTextSize);
             mHourPaint.setTextSize(textSize);
+            mMinutePaint.setTextSize(textSize);
+            mColonPaint.setTextSize(textSize);
+            mColonWidth = mColonPaint.measureText(COLON_STRING);
         }
-
+        
         /**
          * Starts the {@link #mUpdateTimeHandler} timer if it should be running and isn't currently
          * or stops it if it shouldn't be running but currently is.
