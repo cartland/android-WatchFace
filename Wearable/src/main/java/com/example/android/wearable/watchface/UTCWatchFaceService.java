@@ -42,11 +42,10 @@ import android.view.WindowInsets;
 import java.util.TimeZone;
 
 /**
- * Sample analog watch face with a ticking second hand. In ambient mode, the second hand isn't
- * shown. On devices with low-bit ambient mode, the hands are drawn without anti-aliasing in ambient
+ * Watch face with an analog representation of UTC time and the local timezone.
+ * On devices with low-bit ambient mode, the hands are drawn without anti-aliasing in ambient
  * mode. The watch face is drawn with less contrast in mute mode.
  *
- * {@link SweepWatchFaceService} is similar but has a sweep second hand.
  */
 public class UTCWatchFaceService extends CanvasWatchFaceService {
     private static final String TAG = "UTCWatchFaceService";
@@ -126,8 +125,8 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         Bitmap mBackgroundBitmap;
         Bitmap mBackgroundScaledBitmap;
-        private float mYOffset;
         private final Rect mCardBounds = new Rect();
+        private float mLastDesiredHeight;
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -145,8 +144,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             Resources resources = UTCWatchFaceService.this.getResources();
             Drawable backgroundDrawable = resources.getDrawable(R.drawable.bg);
             mBackgroundBitmap = ((BitmapDrawable) backgroundDrawable).getBitmap();
-
-            mYOffset = resources.getDimension(R.dimen.digital_y_offset);
 
             mHourTickPaint = createTextPaint(resources.getColor(R.color.hour_tick), BOLD_TYPEFACE);
             mMinutePaint = createTextPaint(resources.getColor(R.color.current_hour));
@@ -263,26 +260,29 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                 desiredHeight = boundsHeight;
             }
 
-            // Animate watch changing size.
-            if (mLastUpdate < 0) {
-                mWatchHeight = desiredHeight;
-            } else if (desiredHeight != (int) mWatchHeight) {
-                float elapseMs = now - mLastUpdate;
-                int diff = desiredHeight - (int) mWatchHeight;
-                float velocityPx = ANIMATION_PIXELS_PER_SECOND * elapseMs / 1000;
-                if (diff > 0) {
-                    velocityPx *= 1.5f;
-                }
-                if (Math.abs(diff) <= velocityPx) {
+            if (!isInAmbientMode() && desiredHeight == mLastDesiredHeight) {
+                // Animate watch changing size.
+                if (mLastUpdate < 0) {
                     mWatchHeight = desiredHeight;
-                } else if (diff > 0) {
-                    mWatchHeight += velocityPx * 1.5;
-                } else if (diff < 0) {
-                    mWatchHeight -= velocityPx;
-                } else {
-                    mWatchHeight = desiredHeight;
+                } else if (desiredHeight != (int) mWatchHeight) {
+                    float elapseMs = now - mLastUpdate;
+                    int diff = desiredHeight - (int) mWatchHeight;
+                    float velocityPx = ANIMATION_PIXELS_PER_SECOND * elapseMs / 1000;
+                    if (diff > 0) {
+                        velocityPx *= 1.5f;
+                    }
+                    if (Math.abs(diff) <= velocityPx) {
+                        mWatchHeight = desiredHeight;
+                    } else if (diff > 0) {
+                        mWatchHeight += velocityPx * 1.5;
+                    } else if (diff < 0) {
+                        mWatchHeight -= velocityPx;
+                    } else {
+                        mWatchHeight = desiredHeight;
+                    }
                 }
             }
+            mLastDesiredHeight = desiredHeight;
             mWatchHeight = Math.max(1, Math.min(boundsHeight, mWatchHeight));
             mLastUpdate = now;
 
