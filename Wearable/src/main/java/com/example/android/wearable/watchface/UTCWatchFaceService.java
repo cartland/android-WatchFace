@@ -306,7 +306,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             float dotX = (float) Math.sin(hourRot) * hourRadius;
             float dotY = (float) -Math.cos(hourRot) * hourRadius;
             Resources resources = UTCWatchFaceService.this.getResources();
-            float dotRadius = resources.getDimension(R.dimen.utc_text_size) * .6f;
+            float dotRadius = resources.getDimension(R.dimen.utc_text_size) * .5f;
             canvas.drawCircle(centerX + dotX, centerY + dotY, dotRadius, mCurrentHourDotPaint);
 
             // Draw other hour circle.
@@ -323,9 +323,9 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             mTime.switchTimezone(zone);
 
             // Draw the hours in a spiral.
-            hourRadius = radius - 10 - textHeight;
             for (int tickIndex = 0; tickIndex < 24; tickIndex++) {
                 float tickRot = (float) (tickIndex * Math.PI * 2 / 12);
+                hourRadius = radius - 10 - textHeight - spiralStep * tickIndex;
                 float innerX = (float) Math.sin(tickRot) * hourRadius;
                 float innerY = (float) -Math.cos(tickRot) * hourRadius;
                 String hourText = Integer.toString(tickIndex);
@@ -334,7 +334,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                 float textCenterY = centerY + innerY;
                 canvas.drawText(hourText, textCenterX - (hourWidth / 2),
                         textCenterY + (textHeight / 2), mHourTickPaint);
-                hourRadius -= spiralStep;
             }
 
             String minuteString = formatTwoDigitNumber(mTime.minute);
