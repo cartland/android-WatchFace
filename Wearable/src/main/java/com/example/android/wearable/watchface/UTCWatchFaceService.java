@@ -68,7 +68,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
     }
 
     private class Engine extends CanvasWatchFaceService.Engine {
-        private static final String MINUTE_ABBREVIATION = "m";
 
         private static final int MSG_UPDATE_TIME = 0;
 
@@ -79,7 +78,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         private Paint mUTCDiffPaint;
         private Paint mCurrentHourDotPaint;
         private Paint mUTCCirclePaint;
-        private Paint mMinuteAbbreviationPaint;
 
         private boolean mMute;
         private Time mTime;
@@ -129,7 +127,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         Bitmap mBackgroundBitmap;
         Bitmap mBackgroundScaledBitmap;
         private float mYOffset;
-        private float mMinuteAbbreviationWidth;
         private final Rect mCardBounds = new Rect();
 
         @Override
@@ -153,22 +150,19 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             mHourTickPaint = createTextPaint(resources.getColor(R.color.hour_tick), BOLD_TYPEFACE);
             mMinutePaint = createTextPaint(resources.getColor(R.color.current_hour));
-            mUTCDiffPaint = createTextPaint(resources.getColor(R.color.current_hour));
+            mUTCDiffPaint = createTextPaint(resources.getColor(R.color.utc_diff));
 
             mCurrentHourDotPaint = new Paint();
             mCurrentHourDotPaint.setColor(resources.getColor(R.color.current_hour));
-            mCurrentHourDotPaint.setStrokeWidth(2f);
+            mCurrentHourDotPaint.setStrokeWidth(5f);
             mCurrentHourDotPaint.setAntiAlias(true);
-            mCurrentHourDotPaint.setStrokeCap(Paint.Cap.ROUND);
+            mCurrentHourDotPaint.setStyle(Paint.Style.STROKE);
 
             mUTCCirclePaint = new Paint();
             mUTCCirclePaint.setColor(resources.getColor(R.color.utc_hour));
-            mUTCCirclePaint.setStrokeWidth(5f);
+            mUTCCirclePaint.setStrokeWidth(2f);
             mUTCCirclePaint.setAntiAlias(true);
             mUTCCirclePaint.setStyle(Paint.Style.STROKE);
-
-            mMinuteAbbreviationPaint =
-                    createTextPaint(resources.getColor(R.color.minute_abbrevation));
 
             mTime = new Time();
         }
@@ -220,7 +214,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                 mHourTickPaint.setAntiAlias(antiAlias);
                 mMinutePaint.setAntiAlias(antiAlias);
                 mCurrentHourDotPaint.setAntiAlias(antiAlias);
-                mMinuteAbbreviationPaint.setAntiAlias(antiAlias);
                 mUTCCirclePaint.setAntiAlias(antiAlias);
                 mUTCDiffPaint.setAntiAlias(antiAlias);
             }
@@ -240,7 +233,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                 mHourTickPaint.setAlpha(inMuteMode ? 100 : 255);
                 mMinutePaint.setAlpha(inMuteMode ? 100 : 255);
                 mCurrentHourDotPaint.setAlpha(inMuteMode ? 80 : 255);
-                mMinuteAbbreviationPaint.setAlpha(inMuteMode ? 100 : 255);
                 mUTCDiffPaint.setAlpha(inMuteMode ? 80 : 180);
                 mUTCCirclePaint.setAlpha(inMuteMode ? 80 : 255);
                 invalidate();
@@ -276,12 +268,15 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                 mWatchHeight = desiredHeight;
             } else if (desiredHeight != (int) mWatchHeight) {
                 float elapseMs = now - mLastUpdate;
-                float velocityPx = ANIMATION_PIXELS_PER_SECOND * elapseMs / 1000;
                 int diff = desiredHeight - (int) mWatchHeight;
+                float velocityPx = ANIMATION_PIXELS_PER_SECOND * elapseMs / 1000;
+                if (diff > 0) {
+                    velocityPx *= 1.5f;
+                }
                 if (Math.abs(diff) <= velocityPx) {
                     mWatchHeight = desiredHeight;
                 } else if (diff > 0) {
-                    mWatchHeight += velocityPx;
+                    mWatchHeight += velocityPx * 1.5;
                 } else if (diff < 0) {
                     mWatchHeight -= velocityPx;
                 } else {
@@ -344,15 +339,11 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             String minuteString = formatTwoDigitNumber(mTime.minute);
             float minuteWidth = mMinutePaint.measureText(minuteString);
 
-            float x = centerX - (minuteWidth + mMinuteAbbreviationWidth) / 2;
+            float x = centerX - (minuteWidth) / 2;
 
             // Draw the minutes.
             canvas.drawText(minuteString, x, mYOffset, mMinutePaint);
             x += minuteWidth;
-
-            // Draw the minute abbreviation.
-            canvas.drawText(MINUTE_ABBREVIATION, x, mYOffset, mMinuteAbbreviationPaint);
-            x += mMinuteAbbreviationWidth;
 
             // Draw the UTC diff.
             Rect minuteBounds = new Rect();
@@ -451,8 +442,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             mHourTickPaint.setTextSize(tickTextSize);
             mMinutePaint.setTextSize(minuteTextSize);
-            mMinuteAbbreviationPaint.setTextSize(textSize);
-            mMinuteAbbreviationWidth = mMinuteAbbreviationPaint.measureText(MINUTE_ABBREVIATION);
             mUTCDiffPaint.setTextSize(tickTextSize);
         }
 
