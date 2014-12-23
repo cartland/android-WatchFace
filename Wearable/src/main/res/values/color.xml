@@ -22,7 +22,7 @@
     <color name="color_item_label_color">#000000</color>
     <color name="color_item_circle_border_color">#424242</color>
     <color name="hour_tick">#FFAAAAAA</color>
-    <color name="current_hour">#FFAA0000</color>
-    <color name="utc_diff">#FFAA0000</color>
+    <color name="current_hour">#FFFF0000</color>
+    <color name="utc_diff">#FFFF0000</color>
     <color name="utc_hour">#FFAAAAAA</color>
 </resources>
