@@ -81,7 +81,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
         private long mLastUpdate = -1;
         private final Rect mCardBounds = new Rect();
         private float mLastDesiredHeight;
-        private long mTimeOfDesiredHeight;
+        private long mTimeOfDesiredHeightChanged;
 
         /** Handler to update the time once a second in interactive mode. */
         final Handler mUpdateTimeHandler = new Handler() {
@@ -138,9 +138,12 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
             mHourPaint = createTextPaint(resources.getColor(R.color.hour_default), BOLD_TYPEFACE);
             mHourPaint.setTextAlign(Paint.Align.CENTER);
-            mHandPaint = createTextPaint(resources.getColor(R.color.hand_color));
+
+            mHandPaint = new Paint();
+            mHandPaint.setColor(resources.getColor(R.color.hand_color));
             mHandPaint.setStrokeWidth(3.f);
             mHandPaint.setAntiAlias(true);
+            mHandPaint.setStyle(Paint.Style.STROKE);
             mHandPaint.setStrokeCap(Paint.Cap.ROUND);
 
             mUTCLabelPaint = createTextPaint(resources.getColor(R.color.utc_label));
@@ -248,7 +251,7 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             float radius = Math.min(centerX, centerY);
 
             // Draw the minutes.
-            drawMinuteLine(canvas, mTime.minute, mHandPaint, radius, centerX, centerY,
+            drawMinuteLine(canvas, mTime.minute, mCurrentHourPaint, radius, centerX, centerY,
                     mHourPaint);
 
             drawHourLine(canvas, mTime.hour, mHandPaint, radius, centerX, centerY,
@@ -264,10 +267,16 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             // Draw the hours in a spiral.
             for (int hour = 0; hour < 24; hour++) {
                 if (hour == mTime.hour || hour == gmtHour) {
-                    float size = mHourPaint.getTextSize();
                     float outerTextBuffer = getTextHeight(Integer.toString(hour), mHourPaint);
-                    mHourPaint.setTextSize(size * 2);
                     float hourRadius = calculateHourRadius(radius, hour, outerTextBuffer);
+
+                    // Bigger.
+                    float size = mHourPaint.getTextSize();
+                    float bigHourTextSize = getResources().getDimension(mIsRound
+                            ? R.dimen.utc_big_hour_text_size_round : R.dimen.utc_big_hour_text_size);
+                    mHourPaint.setTextSize(bigHourTextSize);
+
+                    // Color.
                     if (hour == mTime.hour) {
                         int color = mHourPaint.getColor();
                         mHourPaint.setColor(getResources().getColor(R.color.current_hour));
@@ -287,7 +296,6 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
                     float hourRadius = calculateHourRadius(radius, hour, textHeight);
                     drawHour(canvas, hour, mHourPaint, hourRadius, centerX, centerY);
                 }
-
             }
 
             // Draw the UTC diff.
@@ -328,9 +336,11 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
 
         private void updateWatchHeight(int desiredHeight, long now) {
             if (desiredHeight != mLastDesiredHeight) {
-                mTimeOfDesiredHeight = now;
+                mTimeOfDesiredHeightChanged = now;
             }
-            if (!isInAmbientMode() && now - mTimeOfDesiredHeight > 200) {
+            if (isInAmbientMode()) {
+                mWatchHeight = desiredHeight;
+            } else if (now - mTimeOfDesiredHeightChanged > 200) {
                 // Animate watch changing size.
                 if (mLastUpdate < 0) {
                     mWatchHeight = desiredHeight;
@@ -504,16 +514,11 @@ public class UTCWatchFaceService extends CanvasWatchFaceService {
             // Load resources that have alternate values for round watches.
             Resources resources = UTCWatchFaceService.this.getResources();
             mIsRound = insets.isRound();
-            float textSize = resources.getDimension(mIsRound
-                    ? R.dimen.utc_text_size_round : R.dimen.utc_text_size);
-            float minuteTextSize = resources.getDimension(mIsRound
-                    ? R.dimen.utc_minute_text_size_round : R.dimen.utc_minute_text_size);
-            float tickTextSize = resources.getDimension(mIsRound
-                    ? R.dimen.utc_tick_text_size_round : R.dimen.utc_tick_text_size);
+            float hourTextSize = resources.getDimension(mIsRound
+                    ? R.dimen.utc_hour_text_size_round : R.dimen.utc_hour_text_size);
 
-            mHourPaint.setTextSize(tickTextSize);
-            mHandPaint.setTextSize(minuteTextSize);
-            mUTCLabelPaint.setTextSize(tickTextSize);
+            mHourPaint.setTextSize(hourTextSize);
+            mUTCLabelPaint.setTextSize(hourTextSize);
         }
 
         @Override
